@@ -32,8 +32,9 @@ def main():
     import datetime
     min_date = datetime.date(1900, 1, 1)
     max_date = datetime.date.today()
-    # value=None defaults to today. min_value fixed to 1900 to allow birth dates.
-    dob_input = st.date_input("Data de Nascimento", value=None, min_value=min_date, max_value=max_date, format="DD/MM/YYYY")
+    default_date = datetime.date(1990, 1, 1)
+    # value set to 1990 to open calendar in a useful range.
+    dob_input = st.date_input("Data de Nascimento", value=default_date, min_value=min_date, max_value=max_date, format="DD/MM/YYYY")
     
     if st.button("Entrar"):
         if cpf_input and dob_input:
