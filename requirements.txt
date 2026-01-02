@@ -1,0 +1,9 @@
+streamlit
+supabase
+pandas
+fpdf
+openpyxl
+kaleido
+plotly
+pytest
+coverage
