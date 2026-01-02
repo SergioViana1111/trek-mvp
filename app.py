@@ -29,9 +29,11 @@ def main():
     st.subheader("Login")
     
     cpf_input = st.text_input("Digite seu CPF", max_chars=14)
-    # Using text_input for date to avoid date format confusion in MVP quick auth, 
-    # or use date_input and format it. Let's use date_input.
-    dob_input = st.date_input("Data de Nascimento", value=None, min_value=None, max_value=None, format="DD/MM/YYYY")
+    import datetime
+    min_date = datetime.date(1900, 1, 1)
+    max_date = datetime.date.today()
+    # value=None defaults to today. min_value fixed to 1900 to allow birth dates.
+    dob_input = st.date_input("Data de Nascimento", value=None, min_value=min_date, max_value=max_date, format="DD/MM/YYYY")
     
     if st.button("Entrar"):
         if cpf_input and dob_input:
