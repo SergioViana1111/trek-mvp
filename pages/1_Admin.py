@@ -16,7 +16,7 @@ if st.session_state.get("role") != "admin":
 
 st.title("Painel Admin (IBUG)")
 
-tab1, tab2 = st.tabs(["Minhas Empresas", "Pedidos"])
+tab1, tab2, tab3 = st.tabs(["Minhas Empresas", "Produtos (Celulares)", "Pedidos"])
 
 # Function to search CNPJ
 def handle_cnpj_search():
@@ -48,7 +48,7 @@ with tab1:
     st.header("Gestão de Empresas")
     
     # Form to add company
-    with st.expander("Nova Empresa", expanded=True):
+    with st.expander("Nova Empresa", expanded=False):
         st.markdown("##### Dados da Empresa")
         col_cnpj, col_btn_cnpj = st.columns([3, 1])
         with col_cnpj:
@@ -126,6 +126,82 @@ with tab1:
         st.error(f"Erro ao carregar empresas: {e}")
 
 with tab2:
+    st.header("Gestão de Produtos (Celulares)")
+    
+    # Form to add product
+    with st.expander("Novo Celular"):
+        with st.form("new_product"):
+            p_brand = st.text_input("Marca (ex: Samsung)")
+            p_model = st.text_input("Modelo (ex: Galaxy S23)")
+            p_img = st.text_input("URL da Imagem")
+            p_desc = st.text_area("Descrição do Aparelho")
+            
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                p_price = st.number_input("Valor Mensal (R$)", min_value=0.0, step=10.0)
+            with c2:
+                p_insur = st.number_input("Seguro (R$)", min_value=0.0, step=10.0)
+            with c3:
+                p_resid = st.number_input("Valor Residual (R$)", min_value=0.0, step=10.0)
+            
+            p_submit = st.form_submit_button("Cadastrar Celular")
+            if p_submit:
+                if not (p_brand and p_model and p_price):
+                    st.error("Preencha Marca, Modelo e Valor.")
+                else:
+                    supabase = get_supabase()
+                    try:
+                        p_data = {
+                            "brand": p_brand,
+                            "model": p_model,
+                            "description": p_desc,
+                            "image_url": p_img,
+                            "monthly_price": p_price,
+                            "insurance_price": p_insur,
+                            "residual_value": p_resid,
+                            "active": True
+                        }
+                        supabase.table("products").insert(p_data).execute()
+                        st.success(f"📱 {p_brand} {p_model} cadastrado!")
+                    except Exception as e:
+                        st.error(f"Erro ao cadastrar: {e}")
+
+    # List products
+    try:
+        supabase = get_supabase()
+        res_prod = supabase.table("products").select("*").order("created_at", desc=True).execute()
+        
+        if res_prod.data:
+            st.markdown("### Catálogo Atual")
+            for prod in res_prod.data:
+                with st.container():
+                    c_img, c_info, c_actions = st.columns([1, 3, 1])
+                    with c_img:
+                        if prod.get("image_url"):
+                            st.image(prod["image_url"], width=80)
+                        else:
+                            st.write("🖼️")
+                    
+                    with c_info:
+                        st.subheader(f"{prod['brand']} {prod['model']}")
+                        st.write(f"Mensal: R$ {prod['monthly_price']} | Ativo: {'✅' if prod['active'] else '❌'}")
+                        
+                    with c_actions:
+                        # Simple toggle active
+                        if st.button(f"{'Desativar' if prod['active'] else 'Ativar'}", key=f"toggle_{prod['id']}"):
+                            new_status = not prod['active']
+                            supabase.table("products").update({"active": new_status}).eq("id", prod['id']).execute()
+                            st.rerun()
+                        
+                        # Note: Full edit would go here via a modal or expander, 
+                        # keeping it simple for MVP as per scope "Basic CRUD"
+                    st.divider()
+                    
+    except Exception as e:
+        st.error(f"Erro ao carregar produtos: {e}")
+
+
+with tab3:
     st.header("Todos os Pedidos")
     st.info("Funcionalidade de listagem de pedidos em breve...")
 
