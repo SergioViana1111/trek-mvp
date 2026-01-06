@@ -2,6 +2,7 @@ import streamlit as st
 from services.auth_service import require_auth
 from services.supabase_client import get_supabase
 from services.consult_service import consult_cnpj, consult_cpf
+from services.pdf_service import generate_contract_pdf
 import datetime
 
 # Page config
@@ -16,7 +17,7 @@ if st.session_state.get("role") != "admin":
 
 st.title("Painel Admin (IBUG)")
 
-tab1, tab2, tab3 = st.tabs(["Minhas Empresas", "Produtos (Celulares)", "Pedidos"])
+tab1, tab2, tab3 = st.tabs(["Minhas Empresas", "Produtos (Celulares)", "Pedidos (Expedição)"])
 
 # Function to search CNPJ
 def handle_cnpj_search():
@@ -193,8 +194,6 @@ with tab2:
                             supabase.table("products").update({"active": new_status}).eq("id", prod['id']).execute()
                             st.rerun()
                         
-                        # Note: Full edit would go here via a modal or expander, 
-                        # keeping it simple for MVP as per scope "Basic CRUD"
                     st.divider()
                     
     except Exception as e:
@@ -202,6 +201,73 @@ with tab2:
 
 
 with tab3:
-    st.header("Todos os Pedidos")
-    st.info("Funcionalidade de listagem de pedidos em breve...")
-
+    st.header("Fila de Pedidos")
+    
+    try:
+        supabase = get_supabase()
+        # Join query
+        res_orders = supabase.table("orders").select(
+            "*, user_profiles(name, cpf, email, phone), products(brand, model, description, monthly_price, insurance_price, residual_value)"
+        ).order("created_at", desc=True).execute()
+        
+        orders = res_orders.data
+        if not orders:
+            st.info("Nenhum pedido encontrado.")
+        else:
+            for order in orders:
+                user_info = order.get("user_profiles", {}) or {}
+                prod_info = order.get("products", {}) or {}
+                status = order.get("status")
+                
+                with st.container():
+                    st.markdown(f"**Pedido #{str(order['id'])[:8]}** - Status: `{status.upper()}`")
+                    col_det, col_act = st.columns([2, 1])
+                    
+                    with col_det:
+                        st.write(f"👤 **{user_info.get('name', 'N/A')}** ({user_info.get('cpf', 'N/A')})")
+                        st.write(f"📱 {prod_info.get('brand')} {prod_info.get('model')}")
+                        st.caption(f"Data: {order.get('created_at')}")
+                        if status == 'dispatched':
+                             st.success(f"IMEI vinculado: {order.get('imei')}")
+                    
+                    with col_act:
+                        if status == "contract_signed":
+                            imei_input = st.text_input(f"IMEI", key=f"imei_{order['id']}")
+                            if st.button("Expedir", key=f"btn_{order['id']}"):
+                                if imei_input:
+                                    # Update Order
+                                    supabase.table("orders").update({
+                                        "status": "dispatched",
+                                        "imei": imei_input
+                                    }).eq("id", order['id']).execute()
+                                    
+                                    # Regenerate PDF with IMEI
+                                    contract_data = {
+                                        "name": user_info.get("name"),
+                                        "cpf": user_info.get("cpf"),
+                                        "email": user_info.get("email"),
+                                        "phone": user_info.get("phone"),
+                                        "address": order.get("delivery_address", {}).get("full", "Endereço ver Detalhes"), # Assuming stored structure
+                                        "acceptance_date": order.get("signed_at")
+                                    }
+                                    # Inject IMEI into product data copy
+                                    prod_with_imei = prod_info.copy()
+                                    prod_with_imei["imei"] = imei_input
+                                    
+                                    # Company fetch (generic)
+                                    company_res = supabase.table("companies").select("*").eq("id", order["company_id"]).execute()
+                                    company_data = company_res.data[0] if company_res.data else {}
+                                    
+                                    new_pdf = generate_contract_pdf(contract_data, prod_with_imei, company_data)
+                                    
+                                    st.success(f"Pedido expedido! PDF atualizado: {new_pdf}")
+                                    st.rerun()
+                                else:
+                                    st.error("Informe o IMEI.")
+                        elif status == "dispatched":
+                            st.write("✅ Concluído")
+                            
+                    st.divider()
+                    
+    except Exception as e:
+        st.error(f"Erro ao carregar pedidos: {e}")

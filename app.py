@@ -1,5 +1,6 @@
 import streamlit as st
 from services.auth_service import login_by_cpf, logout
+import time
 
 st.set_page_config(page_title="Trek - Celular por Assinatura", page_icon="📱", layout="centered")
 
@@ -43,7 +44,8 @@ def main():
             success, msg = login_by_cpf(cpf_input, dob_str)
             if success:
                 st.success(msg)
-                st.rerun()
+                time.sleep(1)
+                st.switch_page("pages/3_Store.py")
             else:
                 st.error(msg)
         else:

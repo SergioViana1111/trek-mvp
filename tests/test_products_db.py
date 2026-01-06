@@ -8,7 +8,7 @@ import time
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-SECRETS_PATH = os.path.join(os.path.dirname(__file__), '..', '.streamlit', 'secrets.toml')
+SECRETS_PATH = os.path.join(os.path.dirname(__file__), '..', 'secrets.toml')
 
 def get_test_supabase_client():
     if not os.path.exists(SECRETS_PATH):

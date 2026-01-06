@@ -12,12 +12,35 @@ class SupabaseService:
         return cls._instance
 
     def _initialize(self):
+        url = None
+        key = None
+        # 1. Try Streamlit Secrets
         try:
-            url = st.secrets["supabase"]["url"]
-            key = st.secrets["supabase"]["key"]
-            self._client = create_client(url, key)
-        except Exception as e:
-            st.error(f"Failed to initialize Supabase client: {e}")
+            if hasattr(st, "secrets") and "supabase" in st.secrets:
+                url = st.secrets["supabase"]["url"]
+                key = st.secrets["supabase"]["key"]
+        except Exception:
+            pass
+
+        # 2. Fallback to local secrets.toml (for tests)
+        if not url:
+            import toml, os
+            try:
+                secrets_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "secrets.toml")
+                if os.path.exists(secrets_path):
+                    data = toml.load(secrets_path)
+                    url = data["supabase"]["url"]
+                    key = data["supabase"]["key"]
+            except Exception:
+                pass
+        
+        if url and key:
+            try:
+                self._client = create_client(url, key)
+            except Exception as e:
+                print(f"Supabase connection error: {e}")
+                self._client = None
+        else:
             self._client = None
 
     @property
