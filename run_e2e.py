@@ -5,9 +5,9 @@ import os
 
 def run_tests():
     # 1. Start Streamlit
-    print("Starting Streamlit on port 8503...")
+    print("Starting Streamlit on port 8504...")
     env = os.environ.copy()
-    env["STREAMLIT_SERVER_PORT"] = "8503"
+    env["STREAMLIT_SERVER_PORT"] = "8504"
     env["STREAMLIT_SERVER_HEADLESS"] = "true"
     
     # Using sys.executable to ensure same python env
@@ -34,9 +34,9 @@ def run_tests():
             
         print("Server assumed running. Starting Tests...")
         
-        # 2. Run Pytest
+        # 2. Run Pytest with UI visible
         result = subprocess.run(
-            [sys.executable, "-m", "pytest", "tests/test_e2e.py"],
+            [sys.executable, "-m", "pytest", "tests/test_e2e.py", "--headed"],
             capture_output=False # Stream output to console
         )
         
