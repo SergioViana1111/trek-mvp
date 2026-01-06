@@ -176,6 +176,15 @@ if st.session_state["terms_accepted"]:
                             "signed_at": datetime.datetime.now().isoformat()
                          }).execute()
 
+                        # Update User Profile with latest contact info
+                        try:
+                            supabase.table("user_profiles").update({
+                                "phone": cell_val,
+                                "email": email_val
+                            }).eq("id", user["id"]).execute()
+                        except Exception as e:
+                            print(f"Failed to update profile: {e}")
+
                         # 3. Send Email
                         subject = "Seu Aditivo de Contrato - Trek"
                         body = f"""Olá {name},

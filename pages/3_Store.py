@@ -65,7 +65,7 @@ cols = st.columns(3)
 for idx, prod in enumerate(products):
     col = cols[idx % 3]
     with col:
-        st.image(prod.get("image_url", "https://via.placeholder.com/150"), use_container_width=True)
+        st.image(prod.get("image_url") or "https://via.placeholder.com/150", use_container_width=True)
         st.subheader(f"{prod['brand']} {prod['model']}")
         st.write(prod.get("description", ""))
         st.write(f"**Mensalidade:** R$ {prod['monthly_price']}")
