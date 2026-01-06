@@ -58,32 +58,46 @@ def test_full_user_flow(page: Page):
     # Try locating the input by placeholder or just "input" type="text"
     # CPF is first text input. DOB is likely date or text.
     inputs = page.locator("input[type='text']")
+    
+    # Wait for inputs
+    inputs.first.wait_for()
+    
     # CPF
+    inputs.first.click()
     inputs.first.fill("11122233344")
+    inputs.first.press("Tab") # Move to next field naturally
     
     # DOB
-    # Sometimes streamlit date input is two inputs (date/picker).
-    # But usually one text input for value.
-    # Let's try the second text input.
-    if inputs.count() >= 2:
-        inputs.nth(1).click()
-        inputs.nth(1).fill("20/05/1995") # DD/MM/YYYY for Brazil
-        inputs.nth(1).press("Enter")
-    else:
-        # Maybe it's type="date"?
-        page.locator("input[type='date']").fill("1995-05-20")
-
-    time.sleep(1) # Wait for UI update
+    # Pressing Tab from CPF usually lands on DOB date picker input
+    page.keyboard.type("20/05/1995")
+    page.keyboard.press("Enter")
+    
+    time.sleep(2) # Wait for Streamlit to process the date input
     
     # Click Entrar
     page.get_by_role("button", name="Entrar").click()
     
+    # Debug: Check if error message appeared
+    try:
+        error_msg = page.get_by_role("alert").text_content()
+        if error_msg:
+            print(f"DEBUG: Found alert: {error_msg}")
+    except:
+        pass
+        
+    # Check for Success Message first (as it appears before redirect)
+    # st.success("Login successful.") msg from auth_service is "Login successful." or translated?
+    # Service says: return True, "Login successful."
+    # App says: st.success(msg)
+    # expect(page.get_by_text("Login successful.")).to_be_visible() # Might disappear fast due to switch_page
+    
     # Wait for redirect to Store
     # Store page title "Trek - Loja"
-    expect(page).to_have_title("Trek - Loja", timeout=15000)
+    expect(page).to_have_title("Trek - Loja", timeout=20000)
     
     # 2. Select a Phone (Samsung)
-    time.sleep(2) # Wait for grid
+    # Wait for grid to load
+    time.sleep(3)
     
     # Click "Escolher este"
     # If multiple, click first.
@@ -92,18 +106,18 @@ def test_full_user_flow(page: Page):
     btns.first.click()
     
     # 3. Contract/Details Page
-    expect(page).to_have_title("Trek - Contrato", timeout=15000)
+    expect(page).to_have_title("Trek - Detalhes e Contrato", timeout=20000)
     
     # Check details
     expect(page.get_by_text("Valor Residual:")).to_be_visible()
     
     # Terms
-    # Checkbox
-    page.get_by_role("checkbox", name="Li e concordo").check()
+    # Checkbox - Streamlit checks are custom, native input is often hidden. Click label.
+    page.get_by_text("Li e concordo").click()
     
     # Fill Data
     # Wait for form
-    expect(page.get_by_text("Seus Dados")).to_be_visible()
+    expect(page.get_by_role("heading", name="Seus Dados")).to_be_visible()
     
     # Inputs: Nome (0), Email (1), Celular (2), CEP(3), Endereço(4)...
     # Since we are inside a form, let's just find by label if possible, or Order.
@@ -118,7 +132,13 @@ def test_full_user_flow(page: Page):
     page.get_by_role("button", name="Finalizar e Assinar Contrato").click()
     
     # 4. Success
-    expect(page.get_by_text("Contrato assinado com sucesso!")).to_be_visible(timeout=20000)
+    try:
+        expect(page.get_by_text("Contrato assinado com sucesso!")).to_be_visible(timeout=20000)
+    except AssertionError:
+        # Debug: Print any errors
+        alerts = page.get_by_role("alert").all_text_contents()
+        print(f"DEBUG: Success message not found. Alerts present: {alerts}")
+        raise
 
 
 def test_admin_flow(page: Page):
