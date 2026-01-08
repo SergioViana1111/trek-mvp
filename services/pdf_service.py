@@ -12,99 +12,111 @@ class ContractPDF(FPDF):
         self.set_font('Arial', 'I', 8)
         self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
 
-def generate_contract_pdf(user_data, product_data, company_data):
+def generate_contract_pdf(contract_data, product_data, company_data):
+    """
+    Generates the Aditivo PDF with specific closed scope fields.
+    
+    contract_data expects:
+    - name, cpf, address, email, phone
+    - start_date, end_date, months
+    - value_monthly_total, residual_value
+    
+    product_data expects:
+    - brand, model, description, imei (optional)
+    """
     pdf = ContractPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=10)
     
-    # 1. Preamble
-    pdf.multi_cell(0, 5, 
-        "Este documento refere-se ao ADITIVO do Contrato-Mãe de Locação de Equipamentos "
-        "firmado entre a LOCADORA e a EMPRESA parceira. O LOCATÁRIO abaixo qualificado adere "
-        "integralmente aos termos do Contrato-Mãe ao assinar este Aditivo.")
-    pdf.ln(5)
-    
-    # 2. Parties
-    pdf.set_font("Arial", 'B', 10)
-    pdf.cell(0, 10, "1. DADOS DO LOCATÁRIO (COLABORADOR)", 0, 1)
+    # 1. Dados do Assinante
+    pdf.set_font("Arial", 'B', 11)
+    pdf.cell(0, 8, "1. DADOS DO ASSINANTE", 0, 1)
     pdf.set_font("Arial", size=10)
     
-    pdf.cell(40, 6, f"Nome:", 0, 0)
-    pdf.cell(0, 6, f"{user_data.get('name')}", 0, 1)
+    fields_subscriber = [
+        ("Nome", contract_data.get('name')),
+        ("CPF", contract_data.get('cpf')),
+        ("Endereço", contract_data.get('address')),
+        ("Celular", contract_data.get('phone')),
+        ("E-mail", contract_data.get('email'))
+    ]
     
-    pdf.cell(40, 6, f"CPF:", 0, 0)
-    pdf.cell(0, 6, f"{user_data.get('cpf')}", 0, 1)
+    for label, value in fields_subscriber:
+        pdf.set_font("Arial", 'B', 10)
+        pdf.cell(30, 6, f"{label}:", 0, 0)
+        pdf.set_font("Arial", size=10)
+        pdf.multi_cell(0, 6, f"{value if value else ''}")
     
-    pdf.cell(40, 6, f"E-mail:", 0, 0)
-    pdf.cell(0, 6, f"{user_data.get('email')}", 0, 1)
-    
-    pdf.cell(40, 6, f"Celular:", 0, 0)
-    pdf.cell(0, 6, f"{user_data.get('phone')}", 0, 1)
-    
-    pdf.cell(40, 6, f"Endereço:", 0, 0)
-    pdf.multi_cell(0, 6, f"{user_data.get('address')}")
     pdf.ln(5)
     
-    # 3. Object
-    pdf.set_font("Arial", 'B', 10)
-    pdf.cell(0, 10, "2. EQUIPAMENTO LOCADO", 0, 1)
-    pdf.set_font("Arial", size=10)
+    # 2. Dados do Aparelho
+    pdf.set_font("Arial", 'B', 11)
+    pdf.cell(0, 8, "2. DADOS DO APARELHO", 0, 1)
     
-    pdf.cell(40, 6, "Marca/Modelo:", 0, 0)
-    pdf.cell(0, 6, f"{product_data.get('brand')} {product_data.get('model')}", 0, 1)
+    fields_device = [
+        ("Marca", product_data.get('brand')),
+        ("Modelo", product_data.get('model')),
+        ("Descrição", product_data.get('description')),
+        ("IMEI", product_data.get('imei') if product_data.get('imei') else "___________________________________")
+    ]
     
-    pdf.cell(40, 6, "Descrição:", 0, 0)
-    pdf.multi_cell(0, 6, f"{product_data.get('description')}")
-    
-    # IMEI
-    pdf.cell(40, 6, "IMEI:", 0, 0)
-    imei = product_data.get('imei')
-    if imei:
-        pdf.cell(0, 6, f"{imei}", 0, 1)
-    else:
-        pdf.cell(0, 6, "___________________________________ (Preenchido na Expedição)", 0, 1)
+    for label, value in fields_device:
+        pdf.set_font("Arial", 'B', 10)
+        pdf.cell(30, 6, f"{label}:", 0, 0)
+        pdf.set_font("Arial", size=10)
+        pdf.multi_cell(0, 6, f"{value if value else ''}")
+        
     pdf.ln(5)
+
+    # 3. Dados da Contratação
+    pdf.set_font("Arial", 'B', 11)
+    pdf.cell(0, 8, "3. DADOS DA CONTRATAÇÃO", 0, 1)
     
-    # 4. Values
-    pdf.set_font("Arial", 'B', 10)
-    pdf.cell(0, 10, "3. VALORES E CONDIÇÕES", 0, 1)
-    pdf.set_font("Arial", size=10)
+    val_monthly = contract_data.get('value_monthly_total')
+    try:
+        val_monthly_fmt = f"R$ {float(val_monthly):.2f}"
+    except:
+        val_monthly_fmt = str(val_monthly)
+
+    val_residual = contract_data.get('residual_value')
+    try:
+        val_residual_fmt = f"R$ {float(val_residual):.2f}"
+    except:
+        val_residual_fmt = str(val_residual)
+
+    fields_contract = [
+        ("Data de Início", contract_data.get('start_date')),
+        ("Data Final", contract_data.get('end_date')),
+        ("Qtd. Meses", str(contract_data.get('months'))),
+        ("Valor (c/ Seg)", val_monthly_fmt),
+        ("Valor Residual", val_residual_fmt)
+    ]
     
-    pdf.cell(50, 6, "Valor da Assinatura Mensal:", 0, 0)
-    pdf.cell(0, 6, f"R$ {product_data.get('monthly_price')}", 0, 1)
-    
-    pdf.cell(50, 6, "Valor do Seguro Mensal:", 0, 0)
-    pdf.cell(0, 6, f"R$ {product_data.get('insurance_price')}", 0, 1)
-    
-    pdf.cell(50, 6, "Valor Residual (Opção de Compra):", 0, 0)
-    pdf.cell(0, 6, f"R$ {product_data.get('residual_value')}", 0, 1)
-    pdf.ln(5)
-    
-    # 5. Acceptance
-    pdf.set_font("Arial", 'B', 10)
-    pdf.cell(0, 10, "4. ACEITE DIGITAL", 0, 1)
-    pdf.set_font("Arial", size=10)
-    
-    acceptance_date = user_data.get('acceptance_date', 'N/A')
-    pdf.multi_cell(0, 5, 
-        f"O LOCATÁRIO declara que LEU E CONCORDOU com os termos do Contrato-Mãe e este Aditivo "
-        f"em {acceptance_date}, através de confirmação eletrônica via sistema TREK.")
-    
+    for label, value in fields_contract:
+        pdf.set_font("Arial", 'B', 10)
+        pdf.cell(40, 6, f"{label}:", 0, 0)
+        pdf.set_font("Arial", size=10)
+        pdf.multi_cell(0, 6, f"{value}")
+        
     pdf.ln(10)
-    pdf.cell(0, 10, "."*60, 0, 1, 'C')
-    pdf.cell(0, 5, "Assinatura Eletrônica Registrada", 0, 1, 'C')
+    
+    # Acceptance Text
+    pdf.set_font("Arial", 'I', 9)
+    pdf.multi_cell(0, 5, 
+        "Ao asssinar este documento, o Assinante declara que leu e concorda com todos os termos do Contrato-Mãe. "
+        "Este documento foi gerado eletronicamente após validação de aceite digital.")
+        
+    pdf.ln(10)
+    pdf.cell(0, 5, "."*50, 0, 1, 'C')
+    pdf.cell(0, 5, "Assinatura Digital - TREK", 0, 1, 'C')
 
     # Save
-    filename = f"aditivo_{user_data.get('cpf')}_{product_data.get('model')}.pdf"
-    # Cleanup filename spaces
+    filename = f"aditivo_{contract_data.get('cpf')}_{product_data.get('model')}.pdf"
     filename = filename.replace(" ", "_").replace("/", "-")
     
-    # If using Streamlit cloud, might want to save to tmp or similar. 
-    # For local/MVP, current dir is fine.
     try:
         pdf.output(filename)
-    except Exception as e:
-        # Fallback if permission issue
+    except:
         filename = "aditivo_temp.pdf"
         pdf.output(filename)
         

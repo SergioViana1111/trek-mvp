@@ -7,6 +7,7 @@ from services.email_service import send_email
 import time
 import datetime
 import urllib.parse
+import os
 
 st.set_page_config(page_title="Trek - Detalhes e Contrato", page_icon="📝")
 
@@ -35,39 +36,47 @@ with col_info:
     st.write(product.get("description", ""))
     
     st.markdown("### Valores")
-    st.write(f"**Assinatura Mensal:** R$ {product['monthly_price']}")
-    st.write(f"**Seguro (Mensal):** R$ {product['insurance_price']}")
+    # CLOSED SCOPE: "Valor da assinatura com seguro (em destaque)"
+    # We sum monthly + insurance for display as per request
+    total_monthly = float(product['monthly_price']) + float(product['insurance_price'])
+    st.metric(label="Valor Mensal com Seguro", value=f"R$ {total_monthly:.2f}")
     
     # Residual Value
     residual = product['residual_value']
     st.write(f"**Valor Residual:** R$ {residual}")
     
-    with st.expander("❓ O que é o Valor Residual?"):
-        st.info("""
-        **O Valor Residual é uma opção de compra ao final do contrato.**
-        
-        - **Se renovar a assinatura** ao final de 21 meses: Você **NÃO PAGA** o valor residual e troca por um aparelho novo.
-        - **Se optar por ficar com o aparelho**: Você paga o valor residual e o aparelho é seu.
-        """)
-        st.video("https://www.youtube.com/watch?v=dQw4w9WgXcQ") # Placeholder video logic
-        st.caption("Vídeo explicativo sobre o Valor Residual.")
+    c_vid_label, c_vid_btn = st.columns([1, 1])
+    with c_vid_label:
+        st.write("❓ O que é o Valor Residual?")
+    
+    # Video Logic
+    # Assuming video is in root. Streamlit usually runs from root.
+    video_path = "video residual.mp4"
+    if os.path.exists(video_path):
+        with open(video_path, 'rb') as v:
+            video_bytes = v.read()
+            st.video(video_bytes)
+    else:
+        st.warning("Vídeo explicativo não encontrado.")
 
 st.divider()
 
 # Mother Contract (Contrato-Mãe)
 with st.expander("📄 Ler Contrato-Mãe (Termos Gerais)"):
-    st.markdown("""
-    ### Contrato de Locação de Equipamentos Móveis - Termos Gerais
+    st.markdown("### Contrato de Locação de Equipamentos Móveis")
+    st.write("Clique abaixo para baixar o contrato completo.")
     
-    1. **OBJETO**: Locação de aparelhos celulares...
-    2. **PRAZO**: O contrato tem vigência de 21 meses...
-    3. **PAGAMENTO**: O pagamento será descontado em folha...
-    4. **SEGURO**: O aparelho conta com seguro contra roubo e furto qualificado...
-    5. **DEVOLUÇÃO**: Ao final, o Locatário pode devolver ou comprar pelo Valor Residual...
-    
-    *(Texto completo do contrato jurídico estaria aqui)*
-    """)
-    st.download_button("Baixar Contrato-Mãe (PDF)", data=b"Mock PDF Content", file_name="contrato_mae.pdf")
+    contract_path = "Contrato MÃE de assinatura de celular .docx"
+    if os.path.exists(contract_path):
+        with open(contract_path, "rb") as f:
+            st.download_button(
+                label="Baixar Contrato-Mãe (.docx)",
+                data=f,
+                file_name="Contrato_Mae_Celular.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+    else:
+        st.error("Arquivo de contrato não encontrado.")
 
 # Acceptance
 st.subheader("Aceite")
@@ -78,11 +87,11 @@ accepted = st.checkbox("Li e concordo com os termos do Contrato-Mãe e as condi�
 
 if accepted:
     st.session_state["terms_accepted"] = True
-    # Log acceptance (in a real app, log to DB immediately or keep in state)
+    # Log acceptance
     if "acceptance_log" not in st.session_state:
          st.session_state["acceptance_log"] = {
              "timestamp": datetime.datetime.now().isoformat(),
-             "ip": "127.0.0.1" # Mock IP
+             "ip": "Simulated IP" 
          }
 
 # --- TELA 3: Coleta de Dados (Só aparece se aceitou) ---
@@ -90,133 +99,140 @@ if accepted:
 if st.session_state["terms_accepted"]:
     st.divider()
     st.header("Seus Dados")
-    st.info("Complete seus dados para gerar o contrato (Aditivo).")
+    st.info("Preencha os dados restantes para gerar o Aditivo.")
     
-    # Pre-fill with session user data if available
+    # Helper for CEP
+    def search_cep():
+        c = st.session_state.get("cep_input_temp", "")
+        if c:
+            res = get_address_from_cep(c)
+            if res:
+                st.session_state["addr_street"] = res.get("street", "")
+                st.session_state["addr_neigh"] = res.get("neighborhood", "")
+                st.session_state["addr_city"] = res.get("city", "")
+                st.session_state["addr_state"] = res.get("state", "")
+                st.toast("Endereço encontrado!", icon="✅")
+            else:
+                st.toast("CEP não encontrado.", icon="❌")
+
+    # Form
     with st.form("contract_form"):
+        # Name and CPF (Frozen from User Profile/Login)
         col_name, col_cpf = st.columns(2)
         with col_name:
-            # Name editable or fixed? Verify requirement. "Coleta: Nome, Endereço... CPF já vem"
-            # User might need to correct name if Login was just CPF lookup? 
-            # Let's assume pre-filled but editable or read-only if strict.
-            name = st.text_input("Nome Completo", value=user.get("name", ""))
+            st.text_input("Nome", value=user.get("name", ""), disabled=True)
         with col_cpf:
             st.text_input("CPF", value=user.get("cpf", ""), disabled=True)
             
+        st.markdown("#### Endereço")
+        c_cep, c_btn = st.columns([3, 1])
+        with c_cep:
+            cep_val = st.text_input("CEP", key="cep_input_temp")
+        with c_btn:
+            st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+            st.form_submit_button("Buscar CEP", on_click=search_cep, type="secondary")
+
+        # Auto-filled fields from session state if available
+        acc_street = st.session_state.get("addr_street", "")
+        acc_neigh = st.session_state.get("addr_neigh", "")
+        
+        col_str, col_num = st.columns([3, 1])
+        with col_str:
+            street_val = st.text_input("Rua/Logradouro", value=acc_street)
+        with col_num:
+            num_val = st.text_input("Número")
+            
+        col_comp, col_bairro = st.columns(2)
+        with col_comp:
+            comp_val = st.text_input("Complemento")
+        with col_bairro:
+            neigh_val = st.text_input("Bairro", value=acc_neigh)
+            
+        st.markdown("#### Contato")
         col_email, col_cell = st.columns(2)
         with col_email:
             email_val = st.text_input("E-mail", value=user.get("email", ""))
         with col_cell:
             cell_val = st.text_input("Celular (com DDD)", value=user.get("phone", ""))
             
-        st.markdown("#### Endereço")
-        col_cep_in, col_cep_btn = st.columns([3, 1])
-        with col_cep_in:
-            cep_val = st.text_input("CEP", value=st.session_state.get("cep_found", ""), key="cep_form")
-        # Note: CEP search inside form is tricky in Streamlit (rerun). 
-        # Better to do outside or use on_change. For simplicity, we assume user types or standard flow.
-        # Actually user requirement allows CEP search. Let's handle it via a separate interactor or just basic fields + helper.
-        
-        col_addr, col_num = st.columns([3, 1])
-        with col_addr:
-            street_val = st.text_input("Endereço (Rua, Av)", value=st.session_state.get("street_found", ""))
-        with col_num:
-            num_val = st.text_input("Número")
-            
-        comp_val = st.text_input("Complemento")
-        neigh_val = st.text_input("Bairro", value=st.session_state.get("neigh_found", ""))
-        
-        submitted = st.form_submit_button("Finalizar e Assinar Contrato")
+        st.markdown("---")
+        submitted = st.form_submit_button("Finalizar e Assinar", type="primary")
         
         if submitted:
-            if not(name and email_val and cell_val and street_val and num_val and cep_val):
-                st.error("Preencha todos os campos obrigatórios.")
+            # required check: CEP, Number, Email, Mobile
+            if not(cep_val and street_val and num_val and email_val and cell_val):
+                st.error("Por favor, preencha CEP, Endereço, Número, Email e Celular.")
             else:
-                with st.spinner("Gerando Aditivo Contratual..."):
-                    # 1. Generate PDF (Additive)
-                    company = user.get("companies", {"name": "Trek", "cnpj": "00.000.000/0001-00"}) # Fallback
+                with st.spinner("Gerando Aditivo..."):
+                    # Construct full address string for PDF
+                    # Format: Rua X, 123, Comp Y - Bairro Z - CEP 00000
+                    full_address = f"{street_val}, {num_val}"
+                    if comp_val:
+                        full_address += f", {comp_val}"
+                    full_address += f" - {neigh_val} - CEP {cep_val}"
                     
+                    # Contract Data Packet
                     contract_data = {
-                        "name": name,
+                        "name": user["name"],
                         "cpf": user["cpf"],
                         "email": email_val,
                         "phone": cell_val,
-                        "address": f"{street_val}, {num_val}, {comp_val} - {neigh_val} - CEP {cep_val}",
-                        "acceptance_date": st.session_state["acceptance_log"]["timestamp"]
+                        "address": full_address,
+                        "start_date": datetime.date.today().strftime("%d/%m/%Y"),
+                        "end_date": (datetime.date.today() + datetime.timedelta(days=21*30)).strftime("%d/%m/%Y"), # Approx
+                        "months": 21,
+                        "value_monthly_total": total_monthly,
+                        "residual_value": residual
                     }
                     
                     try:
-                        pdf_path = generate_contract_pdf(contract_data, product, company)
+                        # 1. Generate PDF
+                        # We pass 'contract_data' which now matches exactly what the PDF Service should expect for the Closed Scope
+                        # We need to make sure pdf_service uses these keys.
                         
-                        # 2. Create Order
+                        pdf_path = generate_contract_pdf(contract_data, product, user.get("companies"))
+                        
+                        # 2. Save Order
                         supabase = get_supabase()
-                        order_data = {
-                            "user_id": user["id"],
-                            "product_id": product["id"],
-                            "company_id": user.get("company_id"),
-                            "status": "contract_signed", # Status created -> signed
-                            "contract_url": "contract_sent_via_email", # Real path in storage
-                            "signed_at": datetime.datetime.now().isoformat(),
-                            "delivery_address": contract_data["address"],
-                            # JSONB extra contact info
-                        }
-                        # Check columns in DB `orders`. `delivery_address` is JSONB.
-                        
-                         # Insert Order
-                        supabase.table("orders").insert({
+                        order_payload = {
                             "user_id": user["id"],
                             "product_id": product["id"],
                             "company_id": user["company_id"],
                             "status": "contract_signed",
                             "delivery_address": {
-                                "full": contract_data["address"],
-                                "cep": cep_val
+                                "full": full_address,
+                                "cep": cep_val,
+                                "street": street_val,
+                                "number": num_val,
+                                "complement": comp_val,
+                                "neighborhood": neigh_val
                             },
-                            "contract_url": pdf_path, # Local path for MVP
-                            "signed_at": datetime.datetime.now().isoformat()
-                         }).execute()
-
-                        # Update User Profile with latest contact info
+                            "contract_url": pdf_path,
+                            "signed_at": datetime.datetime.now().isoformat(),
+                            "imei": None # Started empty
+                        }
+                        
+                        supabase.table("orders").insert(order_payload).execute()
+                        
+                        # Update user contact info
                         try:
                             supabase.table("user_profiles").update({
-                                "phone": cell_val,
+                                "phone": cell_val, 
                                 "email": email_val
                             }).eq("id", user["id"]).execute()
-                        except Exception as e:
-                            print(f"Failed to update profile: {e}")
-
-                        # 3. Send Email
-                        subject = "Seu Aditivo de Contrato - Trek"
-                        body = f"""Olá {name},
+                        except:
+                            pass
                         
-                        Confirmação de assinatura do aparelho {product['brand']} {product['model']}.
-                        Seguem os dados do contrato em anexo.
+                        st.success("Aditivo gerado e pedido realizado!")
+                        st.toast("Pedido enviado para expedição.", icon="🚀")
                         
-                        Atenciosamente,
-                        Equipe Trek
-                        """
-                        send_email(email_val, subject, body, pdf_path) # Uncomment if configured
-                        
-                        st.success("Contrato assinado com sucesso!")
-                        
-                        # WhatsApp Link
-                        wa_text = f"Olá, assinei o contrato do {product['brand']} {product['model']}! Segue meu contato."
+                        # WhatsApp Link (Optional/Nice to have from previous scope)
+                        wa_text = f"Olá, assinei o aditivo do {product['brand']} {product['model']}! Aguardo expedição."
                         wa_link = f"https://wa.me/?text={urllib.parse.quote(wa_text)}"
+                        st.link_button("Avise no WhatsApp", wa_link)
                         
-                        st.markdown(f"""
-                        <a href="{wa_link}" target="_blank">
-                            <button style="background-color:#25D366; color:white; padding:10px 20px; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">
-                                📱 Enviar no WhatsApp
-                            </button>
-                        </a>
-                        """, unsafe_allow_html=True)
-                        
-                        st.balloons()
-                        time.sleep(5)
-                        # Optional: Clear state or redirect
+                        time.sleep(3)
+                        st.switch_page("pages/1_Admin.py") # Redirect somewhere logic, or just stay
                         
                     except Exception as e:
-                        st.error(f"Erro ao processar: {e}")
-
-# CEP Utility (Outside form to allow interactivity without clearing form if possible, or just use form)
-# For MVP, user types address manually if CEP fails not critical.
+                        st.error(f"Erro ao finalizar: {e}")

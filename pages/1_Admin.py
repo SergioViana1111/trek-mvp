@@ -4,6 +4,7 @@ from services.supabase_client import get_supabase
 from services.consult_service import consult_cnpj, consult_cpf
 from services.pdf_service import generate_contract_pdf
 import datetime
+from dateutil.relativedelta import relativedelta
 
 # Page config
 st.set_page_config(page_title="Trek - Admin", page_icon="🔒")
@@ -207,7 +208,7 @@ with tab3:
         supabase = get_supabase()
         # Join query
         res_orders = supabase.table("orders").select(
-            "*, user_profiles(name, cpf, email, phone), products(brand, model, description, monthly_price, insurance_price, residual_value)"
+            "*, user_profiles(name, cpf, email, phone), products(*)"
         ).order("created_at", desc=True).execute()
         
         orders = res_orders.data
@@ -242,14 +243,36 @@ with tab3:
                                     }).eq("id", order['id']).execute()
                                     
                                     # Regenerate PDF with IMEI
+                                    # Calculate dates
+                                    signed_at_dt = datetime.datetime.fromisoformat(order['signed_at'])
+                                    start_date = signed_at_dt.strftime("%d/%m/%Y")
+                                    end_date_dt = signed_at_dt + relativedelta(months=21)
+                                    end_date = end_date_dt.strftime("%d/%m/%Y")
+                                    
+                                    # Address
+                                    deliv = order.get('delivery_address', {})
+                                    address_str = ""
+                                    if isinstance(deliv, dict):
+                                        address_str = deliv.get('full', "")
+                                    else:
+                                        address_str = str(deliv)
+                                    
+                                    total_monthly = float(prod_info.get('monthly_price', 0)) + float(prod_info.get('insurance_price', 0))
+                                    
                                     contract_data = {
                                         "name": user_info.get("name"),
                                         "cpf": user_info.get("cpf"),
                                         "email": user_info.get("email"),
                                         "phone": user_info.get("phone"),
-                                        "address": order.get("delivery_address", {}).get("full", "Endereço ver Detalhes"), # Assuming stored structure
+                                        "address": address_str,
+                                        "start_date": start_date,
+                                        "end_date": end_date,
+                                        "months": 21,
+                                        "value_monthly_total": total_monthly,
+                                        "residual_value": prod_info.get('residual_value'),
                                         "acceptance_date": order.get("signed_at")
                                     }
+                                    
                                     # Inject IMEI into product data copy
                                     prod_with_imei = prod_info.copy()
                                     prod_with_imei["imei"] = imei_input

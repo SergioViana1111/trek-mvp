@@ -4,6 +4,7 @@ import toml
 import pytest
 from supabase import create_client
 import datetime
+from dateutil.relativedelta import relativedelta
 import time
 
 # Add project root to path
@@ -55,6 +56,8 @@ def test_data(supabase):
         "model": f"TestModel {unique_id}",
         "description": "Test Desc",
         "monthly_price": 50.00,
+        "insurance_price": 10.0,
+        "residual_value": 200.0,
         "active": True
     }
     res_prod = supabase.table("products").insert(prod_data).execute()
@@ -90,12 +93,22 @@ def test_full_purchase_flow(supabase, test_data):
     
     # 2. Simulate User Acceptance & PDF Generation
     print("[2] Generating Contract PDF...")
+    
+    total_monthly = float(product["monthly_price"]) + float(product["insurance_price"])
+    start_date = datetime.date.today()
+    end_date = start_date + relativedelta(months=21)
+    
     contract_info = {
         "name": user["name"],
         "cpf": user["cpf"],
         "email": "test@example.com",
         "phone": "11999999999",
-        "address": "Rua Teste, 123",
+        "address": "Rua Teste, 123 - Bairro - CEP 00000000",
+        "start_date": start_date.strftime("%d/%m/%Y"),
+        "end_date": end_date.strftime("%d/%m/%Y"),
+        "months": 21,
+        "value_monthly_total": total_monthly,
+        "residual_value": product["residual_value"],
         "acceptance_date": datetime.datetime.now().isoformat()
     }
     
@@ -113,7 +126,7 @@ def test_full_purchase_flow(supabase, test_data):
         "contract_url": pdf_path,
         "signed_at": datetime.datetime.now().isoformat(),
         "delivery_address": {
-            "full": "Rua Teste, 123",
+            "full": contract_info["address"],
             "cep": "00000-000"
         }
     }
@@ -127,7 +140,7 @@ def test_full_purchase_flow(supabase, test_data):
     print("[4] Admin Dispatching Order...")
     imei = "123456789012345"
     
-    # Update order
+    # Update order to dispatched
     res_update = supabase.table("orders").update({
         "status": "dispatched",
         "imei": imei
@@ -146,8 +159,6 @@ def test_full_purchase_flow(supabase, test_data):
     pdf_path_final = generate_contract_pdf(contract_info, prod_with_imei, company)
     assert os.path.exists(pdf_path_final)
     
-    # Verify file sizes or existence to ensure different file or updated content is feasible
-    # For MVP, just existence is enough.
     print(f"    Final PDF generated: {pdf_path_final}")
     
     print("[SUCCESS] Full flow integration test passed.")
