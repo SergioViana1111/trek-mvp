@@ -47,6 +47,8 @@ if not products:
             "brand": "Samsung", 
             "model": "Galaxy S23", 
             "monthly_price": 149.90, 
+            "insurance_price": 0.0,
+            "residual_value": 0.0,
             "image_url": "https://m.media-amazon.com/images/I/61bK6PMOC3L._AC_SX679_.jpg",
             "description": "128GB, Tela 6.1"
         },
@@ -55,6 +57,8 @@ if not products:
             "brand": "Apple", 
             "model": "iPhone 14", 
             "monthly_price": 199.90, 
+            "insurance_price": 0.0,
+            "residual_value": 0.0,
             "image_url": "https://m.media-amazon.com/images/I/61bK6PMOC3L._AC_SX679_.jpg",
             "description": "128GB, Tela 6.1"
         }

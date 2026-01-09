@@ -35,14 +35,16 @@ with col_info:
     st.header(f"{product['brand']} {product['model']}")
     st.write(product.get("description", ""))
     
-    st.markdown("### Valores")
     # CLOSED SCOPE: "Valor da assinatura com seguro (em destaque)"
     # We sum monthly + insurance for display as per request
-    total_monthly = float(product['monthly_price']) + float(product['insurance_price'])
+    # Handle possible None values from DB using pricing service
+    from services.pricing import calculate_contract_totals
+    
+    total_monthly, residual = calculate_contract_totals(product)
+    
     st.metric(label="Valor Mensal com Seguro", value=f"R$ {total_monthly:.2f}")
     
     # Residual Value
-    residual = product['residual_value']
     st.write(f"**Valor Residual:** R$ {residual}")
     
     c_vid_label, c_vid_btn = st.columns([1, 1])
